@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Checkers Game</title>
+    <style>
+      canvas {
+        border: 1px solid black;
+        background-color: #f0f0f0;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="canvas" width="800" height="800"></canvas>
+    <script>
+      let canvas = document.getElementById("canvas");
+      let ctx = canvas.getContext("2d");
+
+      let board = [];
+      for (let i = 0; i < 8; i++) {
+        let column = new Array(8);
+        board[i] = column;
+      }
+      for (let i = 0; i < 8; i++) {
+        for (let j = 0; j < 8; j++) {
+          if (j < 3 && (i + j) % 2 != 0) {
+            board[i][j] = new Piece(j, i, "red", false, false);
+          } else if (j > 4 && (i + j) % 2 != 0) {
+            board[i][j] = new Piece(j, i, "gray", false, false);
+          } else {
+            board[i][j] = "";
+          }
+        }
+      }
+
+      let currentTurn = "red"; // Red goes first
+      let gameOver = false;
+
+      drawBoard();
+      drawPieces();
+      canvas.onclick = function (event) {
+        if (gameOver) return; // Stop processing if the game is over
+
+        let x = event.offsetX;
+        let y = event.offsetY;
+        let col = Math.floor(x / 100);
+        let row = Math.floor(y / 100);
+        let selectedPiece = getSelectedPiece();
+
+        if (board[col][row] != "" && board[col][row].color !== currentTurn) {
+          alert(`It's ${currentTurn}'s turn!`);
+          return;
+        }
+
+        if (board[col][row] != "") {
+          if (selectedPiece != null && selectedPiece === board[col][row]) {
+            selectedPiece.isClicked = false;
+          } else if (selectedPiece == null) {
+            board[col][row].isClicked = true;
+          }
+        } else {
+          if (selectedPiece != null && selectedPiece.isValidMove(row, col)) {
+            board[col].splice(row, 1, selectedPiece);
+            board[selectedPiece.col].splice(selectedPiece.row, 1, "");
+            selectedPiece.move(row, col);
+            selectedPiece.isClicked = false;
+
+            if (checkForPotentialWinner()) {
+              // Flag game over but allow the last move to be processed
+              gameOver = true;
+            } else {
+              // Switch turns only if the game is not over
+              currentTurn = currentTurn === "red" ? "gray" : "red";
+            }
+          } else {
+            alert("Invalid move");
+          }
+        }
+
+        ctx.clearRect(0, 0, 800, 800);
+        drawBoard();
+        drawPieces();
+
+        if (gameOver && !checkForWinner()) {
+          // Check if the winner announcement is still needed
+          alert(`${currentTurn === "red" ? "Gray" : "Red"} wins!`);
+        }
+      };
+
+      function drawBoard() {
+        for (let x = 0; x < 8; x++) {
+          for (let y = 0; y < 8; y++) {
+            ctx.fillStyle = (x + y) % 2 == 0 ? "white" : "black";
+            ctx.fillRect(x * 100, y * 100, 100, 100);
+          }
+        }
+      }
+
+      function drawPieces() {
+        for (let x = 0; x < 8; x++) {
+          for (let y = 0; y < 8; y++) {
+            if (board[x][y] != "") {
+              board[x][y].draw();
+            }
+          }
+        }
+      }
+
+      function Piece(Row, Col, Colour, isclicked, isking) {
+        this.row = Row;
+        this.col = Col;
+        this.color = Colour;
+        this.isClicked = isclicked;
+        this.isKing = isking;
+
+        this.draw = function () {
+          let cx = this.col * 100 + 50;
+          let cy = this.row * 100 + 50;
+          if (this.isClicked) {
+            ctx.fillStyle = "yellow";
+            ctx.beginPath();
+            ctx.arc(cx, cy, 40, 0, 2 * Math.PI);
+            ctx.fill();
+          }
+          ctx.fillStyle = Colour;
+          ctx.beginPath();
+          ctx.arc(cx, cy, 35, 0, 2 * Math.PI);
+          ctx.fill();
+        };
+
+        this.checkKing = function () {
+          if (this.color == "red" && this.row == 7) {
+            this.isKing = true;
+          } else if (this.color == "gray" && this.row == 0) {
+            this.isKing = true;
+          }
+        };
+
+        this.move = function (newRow, newCol) {
+          this.row = newRow;
+          this.col = newCol;
+          this.checkKing();
+        };
+
+        this.isValidMove = function (newRow, newCol) {
+          if ((newRow + newCol) % 2 !== 0) {
+            if (
+              (this.color == "red" || this.isKing) &&
+              newRow == this.row + 1 &&
+              (newCol == this.col + 1 || newCol == this.col - 1)
+            ) {
+              return true;
+            } else if (
+              (this.color == "gray" || this.isKing) &&
+              newRow == this.row - 1 &&
+              (newCol == this.col - 1 || newCol == this.col + 1)
+            ) {
+              return true;
+            } else if (
+              (this.color == "red" || this.isKing) &&
+              newRow == this.row + 2 &&
+              (newCol == this.col + 2 || newCol == this.col - 2)
+            ) {
+              if (
+                newCol == this.col + 2 &&
+                board[newCol - 1][newRow - 1] != "" &&
+                board[newCol - 1][newRow - 1].color != this.color
+              ) {
+                board[newCol - 1].splice(newRow - 1, 1, "");
+                return true;
+              } else if (
+                newCol == this.col - 2 &&
+                board[newCol + 1][newRow - 1] != "" &&
+                board[newCol + 1][newRow - 1].color != this.color
+              ) {
+                board[newCol + 1].splice(newRow - 1, 1, "");
+                return true;
+              } else {
+                return false;
+              }
+            } else if (
+              (this.color == "gray" || this.isKing) &&
+              newRow == this.row - 2 &&
+              (newCol == this.col - 2 || newCol == this.col + 2)
+            ) {
+              if (
+                newCol == this.col + 2 &&
+                board[newCol - 1][newRow + 1] != "" &&
+                board[newCol - 1][newRow + 1].color != this.color
+              ) {
+                board[newCol - 1].splice(newRow + 1, 1, "");
+                return true;
+              } else if (
+                newCol == this.col - 2 &&
+                board[newCol + 1][newRow + 1] != "" &&
+                board[newCol + 1][newRow + 1].color != this.color
+              ) {
+                board[newCol + 1].splice(newRow + 1, 1, "");
+                return true;
+              } else {
+                return false;
+              }
+            } else {
+              return false;
+            }
+          } else {
+            return false;
+          }
+        };
+      }
+
+      function getSelectedPiece() {
+        for (let o = 0; o < 8; o++) {
+          for (let q = 0; q < 8; q++) {
+            if (board[o][q] != "" && board[o][q].isClicked) {
+              return board[o][q];
+            }
+          }
+        }
+        return null;
+      }
+
+      function checkForPotentialWinner() {
+        let redCount = 0;
+        let grayCount = 0;
+        for (let i = 0; i < 8; i++) {
+          for (let j = 0; j < 8; j++) {
+            if (board[i][j] != "") {
+              if (board[i][j].color == "red") {
+                redCount++;
+              } else if (board[i][j].color == "gray") {
+                grayCount++;
+              }
+            }
+          }
+        }
+
+        if (redCount == 0 || grayCount == 0) {
+          return true; // Game is over
+        }
+        return false; // Game is still ongoing
+      }
+
+      function checkForWinner() {
+        let redCount = 0;
+        let grayCount = 0;
+        for (let i = 0; i < 8; i++) {
+          for (let j = 0; j < 8; j++) {
+            if (board[i][j] != "") {
+              if (board[i][j].color == "red") {
+                redCount++;
+              } else if (board[i][j].color == "gray") {
+                grayCount++;
+              }
+            }
+          }
+        }
+
+        if (redCount == 0) {
+          alert("Gray wins!");
+          return true;
+        } else if (grayCount == 0) {
+          alert("Red wins!");
+          return true;
+        }
+        return false;
+      }
+    </script>
+  </body>
+</html>
